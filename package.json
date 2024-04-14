@@ -1,17 +1,24 @@
 {
-  "name": "coffeeaurbackend",
-  "version": "1.0.0",
-  "description": "backend learn from chai and code",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "javascript",
-    "backend",
-    "coffee",
-    "chai"
-  ],
-  "author": "Abhishek bhagat",
-  "license": "ISC"
+	"name": "coffeeaurbackend",
+	"version": "1.0.0",
+	"description": "backend learn from chai and code",
+	"main": "index.js",
+	"type": "module",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"start": "node index.js",
+		"nodemon": "nodemon src/index.js"
+	},
+	"keywords": [
+		"javascript",
+		"backend",
+		"coffee",
+		"chai"
+	],
+	"author": "Abhishek bhagat",
+	"license": "ISC",
+	"devDependencies": {
+		"nodemon": "^3.1.0",
+		"prettier": "^3.2.5"
+	}
 }
