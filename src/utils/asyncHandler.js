@@ -16,7 +16,7 @@ const asyncHandler = (requestHandler) => (req, res, next) => {
       res
         .status(process.env.error || 500)
         .json({ success: false, message: error.message });
-        next(error)
+      next(error);
     })
   );
 };

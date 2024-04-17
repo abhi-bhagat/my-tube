@@ -4,6 +4,7 @@ class ApiResponse {
      * @param {number} statusCode - HTTP status code
      * @param {*} data - Response data
      * @param {string} message - Message
+     *  we are trying to get status code, data and message from our response .
      */
     constructor(statusCode, data, message = "Success") {
         /**
