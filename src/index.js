@@ -1,10 +1,11 @@
+// mainly for DB connection
+
 // require("dotenv").config({ path: "./env" });
 
 import "dotenv/config";
 import connectDB from "./db/index.js";
-import dotenv from "dotenv";
+import { app } from "./app.js";
 
-dotenv.config({ path: "./env" });
 connectDB()
   .then(() => {
     app.listen(process.env.PORT || 8000, () => {
@@ -12,7 +13,7 @@ connectDB()
     });
   })
   .catch((error) => {
-    `Mongo DB refused to connect! ${error}`;
+    console.error(`Mongo DB refused to connect! ${error}`);
   });
 /*
 //
