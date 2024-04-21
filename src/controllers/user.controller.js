@@ -2,7 +2,9 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { updloadCloudinary } from "../utils/cloudinary.service.js";
+import { uploadCloudinary } from "../utils/cloudinary.service.js";
+
+import CircularJSON from "circular-json";
 // asyncHandler is a higher order function that takes in an another function
 const registerUser = asyncHandler(async (req, res, next) => {
   /*
@@ -18,14 +20,12 @@ STEPS ->  Algorithm
 9. create entry in DB
 10. remove pass and refresh token from response field
 11. check for user creation ? return res : check error
-
 */
 
   const { userName, fullName, password, email } = req.body;
-
-  //   if (fullName === "") {
-  //     throw new ApiError(400, "Please provide your full name");
-  //   }
+  const test = req.body;
+  console.log(`req.body`);
+  // console.log(`${CircularJSON.stringify(req.body)}`);
 
   // NOTE; we can also check each field individually if that's what we want and is an easy approach
 
@@ -52,21 +52,30 @@ STEPS ->  Algorithm
 
   //STEP:3   handle images
   // now that we have created middlewares , it will give us acccess to req.file that will have our avatar and coverImage
-  console.log(`i am req.files - >     ${req.files}`);
+  // console.log(`i am req.files - >     ${CircularJSON.stringify(req.files)}`);
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
-
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  } else {
+    coverImageLocalPath = "";
+  }
   // check for avatar as it is required
   if (!avatarLocalPath) {
-    throw new ApiError(400, "Avatar file is required");
+    throw new ApiError(400, "Avatar file location is required");
   }
 
   // STEP 4: upload image to cloudinary
   // first upload image and then return the url that we will store in avatar file to DB
-  const avatar = await updloadCloudinary(avatarLocalPath);
-
+  const avatar = await uploadCloudinary(avatarLocalPath);
   //do same for coverImage
-  const coverImage = await updloadCloudinary(coverImageLocalPath);
+  const coverImage = await uploadCloudinary(coverImageLocalPath);
+  // console.log(`i am avatar, ${avatar}`);
 
   if (!avatar) {
     throw new ApiError(400, "Avatar file is required");
