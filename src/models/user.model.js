@@ -48,6 +48,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+
+//encrypt the password before saving the schema
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   // if we don't check the condition then this encryption command will run everytime any value of the schema is updated by user
@@ -56,7 +58,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// now we want to check if the password is correct or not
+// now we want to use custom method to check if the password is correct or not
 userSchema.methods.isPasswordCorrect = async function (password) {
   return await bcrypt.compare("password", this.password);
 };

@@ -5,6 +5,31 @@ import { User } from "../models/user.model.js";
 import { uploadCloudinary } from "../utils/cloudinary.service.js";
 
 import CircularJSON from "circular-json";
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    // find user
+    const user = await User.findById(userId);
+    // generate tokens with methods mentioned in schema
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+    // add refresh token to database
+    user.refreshToken = refreshToken;
+    // save user and make sure that valiation is false as otherwise it will look for all  the required fields in DB
+    // but here we are only saving the refresh token
+    await user.save({ validateBeforeSave: false });
+
+    return {
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating refresh and access token"
+    );
+  }
+};
+
 // asyncHandler is a higher order function that takes in an another function
 const registerUser = asyncHandler(async (req, res, next) => {
   /*
@@ -112,4 +137,93 @@ STEPS ->  Algorithm
     .json(new ApiResponse(201, createdUser, "User created successfully"));
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res, next) => {
+  // 1. validate info at front end
+  // req body data collect
+  // validate info with database (username or email)
+  // find user
+  // if not found tell them to register
+  // if yes give access to login
+  // generate access token and refresh tokens for user
+  // send tokens to user via secure cookies
+
+  const { userName, password, email } = req.body;
+
+  if (!userName || !email) {
+    throw new ApiError(400, "Please provide username or email");
+  }
+  const foundUser = await User.findOne({
+    $or: [{ email }, { userName }],
+  });
+  // agr dono k basis pe nahi mila user to matlab user register that e nahi kabhi
+  if (!foundUser) {
+    throw new ApiError(404, "User not found");
+  }
+  const passwordValid = await foundUser.isPasswordCorrect(password);
+  if (!passwordValid) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+  // get access token and refresh tokens
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    foundUser._id
+  );
+
+  // the foundUser that we had doesn't have refreshToken as it was assigned to it afterwards in the function
+  // now either we can update the user with refreshToken or we can make another request to DB to update it
+  const updatedFoundUser = await User.findById(foundUser._id).select(
+    "-password -refreshToken"
+  );
+
+  // send tokens to cookies.
+  // we have to design some options for the cookies
+  const options = {
+    httpOnly: true, // means only server can modify the cookie
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        { user: updatedFoundUser, accessToken, refreshToken },
+        "User logged in successfully"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req, res, next) => {
+  // cookie delete
+  // refresh token delete from DB
+  //find user to logout
+  const foundUser = req.user._id;
+
+  // remove user's refreshToken from database
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  // remove cookies
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+export { registerUser, loginUser, logoutUser };
