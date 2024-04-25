@@ -60,7 +60,7 @@ userSchema.pre("save", async function (next) {
 
 // now we want to use custom method to check if the password is correct or not
 userSchema.methods.isPasswordCorrect = async function (password) {
-  return await bcrypt.compare("password", this.password);
+  return await bcrypt.compare(password, this.password);
 };
 
 // inject custom method to generate access token and refresh token

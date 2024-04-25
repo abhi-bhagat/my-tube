@@ -10,13 +10,16 @@ const generateAccessAndRefreshTokens = async (userId) => {
     // find user
     const user = await User.findById(userId);
     // generate tokens with methods mentioned in schema
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    //! make sure to use await
+    const accessToken = await user.generateAccessToken();
+    const refreshToken = await user.generateRefreshToken();
+    console.log(`refresh token generated`, refreshToken);
+
     // add refresh token to database
     user.refreshToken = refreshToken;
     // save user and make sure that valiation is false as otherwise it will look for all  the required fields in DB
     // but here we are only saving the refresh token
-    await user.save({ validateBeforeSave: false });
+    const retSave = await user.save({ validateBeforeSave: false });
 
     return {
       accessToken: accessToken,
@@ -149,8 +152,10 @@ const loginUser = asyncHandler(async (req, res, next) => {
 
   const { userName, password, email } = req.body;
 
-  if (!userName || !email) {
-    throw new ApiError(400, "Please provide username or email");
+  if (!userName && !email) {
+    // if (!(userName | email)) {
+
+    throw new ApiError(400, "Please provide username and email");
   }
   const foundUser = await User.findOne({
     $or: [{ email }, { userName }],
@@ -171,9 +176,9 @@ const loginUser = asyncHandler(async (req, res, next) => {
   // the foundUser that we had doesn't have refreshToken as it was assigned to it afterwards in the function
   // now either we can update the user with refreshToken or we can make another request to DB to update it
   const updatedFoundUser = await User.findById(foundUser._id).select(
-    "-password -refreshToken"
+    "-password  -refreshToken"
   );
-
+  //! console.log(`I am updaredFoundUser ${updatedFoundUser}`);
   // send tokens to cookies.
   // we have to design some options for the cookies
   const options = {
