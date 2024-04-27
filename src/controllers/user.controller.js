@@ -290,4 +290,136 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changeCurrentPassword = asyncHandler(async (req, res, next) => {
+  //EXP: hanji so theory is that we need to check if the user is logged in already or not first! and that will be checked by the auth middleware . if the user is logged in then the auth middleware will return us user in our req.user field and then we can use that to check if the old password that user has entered matches the one saved or not. IF yes then we will save the new password in the DB
+
+  const { oldPassword, newPassword } = req.body;
+
+  const user = await User.findById(req.user?._id);
+  // now check if the given password is correct or not
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "Old password is incorrect");
+  }
+  //STEP: set new password
+
+  user.password = newPassword;
+  await user.save({ valildateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new ApiResponse(201, {}, "Password has been changed successfully"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res, next) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(201, req.user, "User fetched successfully"));
+});
+
+const updateUserDetails = asyncHandler(async (req, res, next) => {
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    throw new ApiError(400, "Please provide all fields");
+  }
+  //NOTE: we will authenticarte user before performing this step and with that we will have user info
+  const id = req.user?._id;
+  const user = await User.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        fullName: fullName,
+        email,
+      },
+    },
+    { new: true }
+  ).select("-password - refreshToken");
+  // if (!user) {
+  //   throw new ApiError(400, "User not found");
+  // }
+
+  // user.fullName = fullName;
+  // user.email = email;
+
+  // user.save({ validateBeforeSave: false });
+
+  // //! follwing call can be resource consuming
+  // // but we are doing it because i want to return the updated user
+  // const updatedUser = await User.findById(id);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(201, user, "User updated successfully"));
+});
+//update avatar
+
+const updateAvatar = asyncHandler(async (req, res, next) => {
+  //Exp: here we have to make sure that we are passing in two middleware in our route files. one will be from multer and other one should be auth.middleware to check if the user is authentic or not.
+  const id = req.user?._id;
+  //NOTE: all of following is appening after the multer middleware is run
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new error(400, "Avatar file is missing");
+  }
+  const avatar = await uploadCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new error(400, "Error while uploading avatar");
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req,
+    user?._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(201, updatedUser, "Avatar updated successfully"));
+});
+
+const updateCoverImage = asyncHandler(async (req, res, next) => {
+  //Exp: here we have to make sure that we are passing in two middleware in our route files. one will be from multer and other one should be auth.middleware to check if the user is authentic or not.
+
+  //NOTE: all of following is happening after the multer middleware is run
+
+  const coverImageLocalPath = req.file?.path;
+  if (!coverImageLocalPath) {
+    throw new error(400, "Cover file is missing");
+  }
+  const coverImage = await uploadCloudinary(coverImageLocalPath);
+  if (!coverImage.url) {
+    throw new error(400, "Error while uploading coverImage");
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req,
+    user?._id,
+    {
+      $set: {
+        coverImage: coverImage.url,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(201, updatedUser, "cover image updated successfully")
+    );
+});
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateUserDetails,
+  updateAvatar,
+  updateCoverImage,
+};
