@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadCloudinary } from "../utils/cloudinary.service.js";
+import jwt from "jsonwebtoken";
 
 import CircularJSON from "circular-json";
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -13,7 +14,6 @@ const generateAccessAndRefreshTokens = async (userId) => {
     //! make sure to use await
     const accessToken = await user.generateAccessToken();
     const refreshToken = await user.generateRefreshToken();
-    console.log(`refresh token generated`, refreshToken);
 
     // add refresh token to database
     user.refreshToken = refreshToken;
@@ -178,7 +178,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
   const updatedFoundUser = await User.findById(foundUser._id).select(
     "-password  -refreshToken"
   );
-  //! console.log(`I am updaredFoundUser ${updatedFoundUser}`);
+  // `! console.log(`I am updaredFoundUser ${updatedFoundUser}`);
   // send tokens to cookies.
   // we have to design some options for the cookies
   const options = {
@@ -231,4 +231,63 @@ const logoutUser = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
-export { registerUser, loginUser, logoutUser };
+const refreshAccessToken = asyncHandler(async (req, res, next) => {
+  //EXP : In a situation where the access token is expired, we will check user's refresh token and then see it it is valid or not. If it is valid then we will generate new access token and send it to the user. If it is not valid then we will throw an error.
+
+  //STEP : get refreshToken from user(via cookies)
+
+  const incomingRefreshToken =
+    req.cookies?.refreshToken || req.body.refreshToken;
+
+  if (!incomingRefreshToken) {
+    new ApiError(401, "Unauthorized request");
+  }
+
+  //STEP: verify incomingRefreshToken
+
+  try {
+    const decodedRefreshToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+    //STEP: find user if the access token is found
+    const foundUser = await User.findById(decodedRefreshToken?._id);
+    if (!foundUser) {
+      new ApiError(401, "Invalid refresh token");
+    }
+
+    //NOTE: we used incomingRefreshToken and not decoded token as incoming refresh token in the one that is saved in the DB of our user and that has all the info like : user id.
+    //NOTE: we used decodedToken to get the userId from the token so that we can find the user from DB and then compare.
+
+    //STEP: match incomingRefresh token with the backend
+    if (incomingRefreshToken !== foundUser?.refreshToken) {
+      throw new ApiError(401, "Expired/Invalid refresh token");
+    }
+
+    //STEP: save new refresh and access tokens in the cookies and give to user
+    // generate options
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+    // generate access and refresh token
+    const { newRefreshToken, newAccessToken } =
+      await generateAccessAndRefreshTokens(foundUser._id);
+    //STEP :  now return the response to the user
+    return res
+      .status(200)
+      .cookies("accessToken", newAccessToken)
+      .cookies("refreshToken", newRefreshToken)
+      .json(
+        new ApiResponse(
+          201,
+          { accessToken: newAccessToken, refreshToken: newRefreshToken },
+          "Access token refreshed"
+        )
+      );
+  } catch (error) {
+    throw new ApiError(401, error.message || "Problem decoding refresh token");
+  }
+});
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
