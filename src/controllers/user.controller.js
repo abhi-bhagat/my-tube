@@ -14,7 +14,6 @@ const generateAccessAndRefreshTokens = async (userId) => {
     //! make sure to use await
     const accessToken = await user.generateAccessToken();
     const refreshToken = await user.generateRefreshToken();
-
     // add refresh token to database
     user.refreshToken = refreshToken;
     // save user and make sure that valiation is false as otherwise it will look for all  the required fields in DB
@@ -498,6 +497,56 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
     .status(200)
     .json(new ApiResponse(400, channel[0], "channel found"));
 });
+
+const getWatchHistory = asyncHandler(async (req, res, next) => {
+  const { id } = req.user?._id;
+  const user = await User.aggregate(
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    userName: 1,
+                    email: 1,
+                    fullName: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    }
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user[0].watchHistory, "history found successfully"));
+});
 export {
   registerUser,
   loginUser,
@@ -509,4 +558,5 @@ export {
   updateAvatar,
   updateCoverImage,
   getUserChannelProfile,
+  getWatchHistory,
 };
