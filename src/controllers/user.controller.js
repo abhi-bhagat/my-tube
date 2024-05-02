@@ -350,7 +350,6 @@ const updateUserDetails = asyncHandler(async (req, res, next) => {
     .status(200)
     .json(new ApiResponse(201, user, "User updated successfully"));
 });
-//update avatar
 
 const updateAvatar = asyncHandler(async (req, res, next) => {
   //Exp: here we have to make sure that we are passing in two middleware in our route files. one will be from multer and other one should be auth.middleware to check if the user is authentic or not.
@@ -381,7 +380,7 @@ const updateAvatar = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(201, updatedUser, "Avatar updated successfully"));
 });
 
-const updateCoverImage = asyncHandler(async (req, res, next) => {
+const updateCoverImage = asyncHandler(async (req, res, _) => {
   //Exp: here we have to make sure that we are passing in two middleware in our route files. one will be from multer and other one should be auth.middleware to check if the user is authentic or not.
 
   //NOTE: all of following is happening after the multer middleware is run
@@ -412,6 +411,93 @@ const updateCoverImage = asyncHandler(async (req, res, next) => {
       new ApiResponse(201, updatedUser, "cover image updated successfully")
     );
 });
+const getUserChannelProfile = asyncHandler(async (req, res, next) => {
+  const { userName } = req.params;
+  if (!userName?.trim) {
+    throw new ApiError(401, "UserName not found");
+  }
+  const channel = await User.aggregate([
+    //STEP: we find the user
+    {
+      $match: {
+        userName: userName?.toLowerCase(),
+      },
+    },
+    // following will return us all the subscribers for the given channel
+    //STEP: we find subscribers for chennel
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: _id,
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    //STEP#: find the channels we are subscribed to
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: _id,
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    //STEP4: add some fields that we have to pass to user model, eg. number of subscribers and number of channels we are subscribed to
+    {
+      $addFields: {
+        // how many users are subscribed to us
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        // how many channels have we subscribed to
+        channelsSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+        //EXP: now we have to check if we are subscribed to a channel or not. for that we will check if we are in subsscriber or not
+        //EXP: if we are then we will return true and if we aren't then we will return false
+        //EXP: here we will  use a $cond operator the  will chek the condit,
+        //EXP if takes in 3 variables , if then else.
+        isSubscribed: {
+          $cond: {
+            //*- here we are finding the user from req.user as at this moment we will be logged in. we will use $in operator to check if the user is in the subscribers or not. $in takes and array that has "what to find, where to find"
+            //* in what to find we have user's id
+            //* in where to find we have subscribes that we got from above pipeline
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+
+    //STEP:5 finally,  we will r etuen the selected value of user, for eg we will not retun password and update and created at.
+    {
+      $project: {
+        fullName: 1,
+        email: 1,
+        userName: 1,
+        email: 1,
+        isSubscribed: 1,
+        subscribersCount: 1,
+        channelsSubscribedToCount: 1,
+        avatar: 1,
+        coverImage: 1,
+      },
+    },
+  ]);
+  console.log(channel);
+
+  if (!channel?.length) {
+    throw new ApiError(400, "channel not found");
+  }
+
+  //EXP: remember this channel comes back in form of array that has all the results as objects
+  //exp:    [{},{},{}]
+  //* so we will try to return in a better way, maybe an object so that frontend is not crying
+  return res
+    .status(200)
+    .json(new ApiResponse(400, channel[0], "channel found"));
+});
 export {
   registerUser,
   loginUser,
@@ -422,4 +508,5 @@ export {
   updateUserDetails,
   updateAvatar,
   updateCoverImage,
+  getUserChannelProfile,
 };
