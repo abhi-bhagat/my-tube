@@ -498,7 +498,7 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(400, channel[0], "channel found"));
 });
 
-const getWatchHistory = asyncHandler(async (req, res, next) => {
+const getWatchHistory = asyncHandler(async (req, res, _) => {
   const { id } = req.user?._id;
   const user = await User.aggregate(
     {
