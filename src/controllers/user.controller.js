@@ -208,8 +208,8 @@ const logoutUser = asyncHandler(async (req, res, next) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -373,7 +373,7 @@ const updateAvatar = asyncHandler(async (req, res, next) => {
     },
     { new: true }
   ).select("-password -refreshToken");
-
+//todo : add file deletion as well
   return res
     .status(200)
     .json(new ApiResponse(201, updatedUser, "Avatar updated successfully"));
