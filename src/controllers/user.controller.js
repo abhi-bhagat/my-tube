@@ -499,7 +499,7 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
   //* so we will try to return in a better way, maybe an object so that frontend is not crying
   return res
     .status(200)
-    .json(new ApiResponse(400, channel[0], "channel found"));
+    .json(new ApiResponse(200, channel[0], "channel found"));
 });
 
 const getWatchHistory = asyncHandler(async (req, res, _) => {
