@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadCloudinary } from "../utils/cloudinary.service.js";
 import jwt from "jsonwebtoken";
-
+import mongoose from "mongoose";
 import CircularJSON from "circular-json";
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -177,7 +177,6 @@ const loginUser = asyncHandler(async (req, res, next) => {
   const updatedFoundUser = await User.findById(foundUser._id).select(
     "-password  -refreshToken"
   );
-  // `! console.log(`I am updaredFoundUser ${updatedFoundUser}`);
   // send tokens to cookies.
   // we have to design some options for the cookies
   const options = {
@@ -236,7 +235,7 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
   //STEP : get refreshToken from user(via cookies)
 
   const incomingRefreshToken =
-    req.cookies?.refreshToken || req.body.refreshToken;
+    req.cookies.refreshToken || req.body.refreshToken;
 
   if (!incomingRefreshToken) {
     new ApiError(401, "Unauthorized request");
@@ -251,6 +250,7 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
     );
     //STEP: find user if the access token is found
     const foundUser = await User.findById(decodedRefreshToken?._id);
+
     if (!foundUser) {
       new ApiError(401, "Invalid refresh token");
     }
@@ -270,17 +270,18 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
       secure: true,
     };
     // generate access and refresh token
-    const { newRefreshToken, newAccessToken } =
-      await generateAccessAndRefreshTokens(foundUser._id);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      foundUser._id
+    );
     //STEP :  now return the response to the user
     return res
       .status(200)
-      .cookies("accessToken", newAccessToken)
-      .cookies("refreshToken", newRefreshToken)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(
         new ApiResponse(
           201,
-          { accessToken: newAccessToken, refreshToken: newRefreshToken },
+          { accessToken, refreshToken },
           "Access token refreshed"
         )
       );
@@ -320,7 +321,7 @@ const updateUserDetails = asyncHandler(async (req, res, next) => {
   if (!fullName || !email) {
     throw new ApiError(400, "Please provide all fields");
   }
-  //NOTE: we will authenticarte user before performing this step and with that we will have user info
+  //NOTE: we will authenticate user before performing this step and with that we will have user info
   const id = req.user?._id;
   const user = await User.findByIdAndUpdate(
     id,
@@ -331,7 +332,12 @@ const updateUserDetails = asyncHandler(async (req, res, next) => {
       },
     },
     { new: true }
-  ).select("-password - refreshToken");
+  ).select("-password -refreshToken");
+
+  //
+
+  //
+
   // if (!user) {
   //   throw new ApiError(400, "User not found");
   // }
@@ -342,7 +348,7 @@ const updateUserDetails = asyncHandler(async (req, res, next) => {
   // user.save({ validateBeforeSave: false });
 
   // //! follwing call can be resource consuming
-  // // but we are doing it because i want to return the updated user
+  // but we are doing it because i want to return the updated user
   // const updatedUser = await User.findById(id);
 
   return res
@@ -364,8 +370,7 @@ const updateAvatar = asyncHandler(async (req, res, next) => {
   }
 
   const updatedUser = await User.findByIdAndUpdate(
-    req,
-    user?._id,
+    req.user?._id,
     {
       $set: {
         avatar: avatar.url,
@@ -373,7 +378,7 @@ const updateAvatar = asyncHandler(async (req, res, next) => {
     },
     { new: true }
   ).select("-password -refreshToken");
-//todo : add file deletion as well
+  //todo : add file deletion as well
   return res
     .status(200)
     .json(new ApiResponse(201, updatedUser, "Avatar updated successfully"));
@@ -394,8 +399,7 @@ const updateCoverImage = asyncHandler(async (req, res, _) => {
   }
 
   const updatedUser = await User.findByIdAndUpdate(
-    req,
-    user?._id,
+    req.user?._id,
     {
       $set: {
         coverImage: coverImage.url,
@@ -412,8 +416,9 @@ const updateCoverImage = asyncHandler(async (req, res, _) => {
 });
 const getUserChannelProfile = asyncHandler(async (req, res, next) => {
   const { userName } = req.params;
+
   if (!userName?.trim) {
-    throw new ApiError(401, "UserName not found");
+    throw new ApiError(401, "Username is missing");
   }
   const channel = await User.aggregate([
     //STEP: we find the user
@@ -422,12 +427,13 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
         userName: userName?.toLowerCase(),
       },
     },
+
     // following will return us all the subscribers for the given channel
-    //STEP: we find subscribers for chennel
+    //STEP: we find subscribers for channel
     {
       $lookup: {
         from: "subscriptions",
-        localField: _id,
+        localField: "_id",
         foreignField: "channel",
         as: "subscribers",
       },
@@ -436,7 +442,7 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
     {
       $lookup: {
         from: "subscriptions",
-        localField: _id,
+        localField: "_id",
         foreignField: "subscriber",
         as: "subscribedTo",
       },
@@ -469,7 +475,7 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
       },
     },
 
-    //STEP:5 finally,  we will r etuen the selected value of user, for eg we will not retun password and update and created at.
+    //STEP:5 finally,  we will return the selected value of user, for eg we will not retun password and update and created at.
     {
       $project: {
         fullName: 1,
@@ -484,8 +490,6 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
       },
     },
   ]);
-  console.log(channel);
-
   if (!channel?.length) {
     throw new ApiError(400, "channel not found");
   }
@@ -499,11 +503,10 @@ const getUserChannelProfile = asyncHandler(async (req, res, next) => {
 });
 
 const getWatchHistory = asyncHandler(async (req, res, _) => {
-  const { id } = req.user?._id;
-  const user = await User.aggregate(
+  const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(id),
+        _id: new mongoose.Types.ObjectId(req.user?._id),
       },
     },
     {
@@ -540,12 +543,13 @@ const getWatchHistory = asyncHandler(async (req, res, _) => {
           },
         ],
       },
-    }
-  );
-
+    },
+  ]);
   return res
     .status(200)
-    .json(new ApiResponse(200, user[0].watchHistory, "history found successfully"));
+    .json(
+      new ApiResponse(200, user[0].watchHistory, "history found successfully")
+    );
 });
 export {
   registerUser,
