@@ -22,9 +22,10 @@ app.use(cookieParser());
 
 // IMPORT ROUTES
 import userRouter from "./routes/user.routes.js";
+import playlistRouter from "./routes/playlist.routes.js";
 
 //ROUTES DECLARATION
 app.use("/api/v1/users", userRouter);
-
+app.use("/api/v1/playlist", playlistRouter);
 
 export { app };
