@@ -5,10 +5,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { uploadCloudinary } from "../utils/cloudinary.service.js";
 //get Videos
 // TODO: get all videos based on query, sort, pagination
-//TODO: check and show videos based on publish status
+
 const getAllVideos = asyncHandler(async (req, res, next) => {
   //* const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-  const videos = await Video.find().populate(
+  const videos = await Video.find({ isPublished: { $eq: true } }).populate(
     "owner",
     "userName fullName avatar"
   );
@@ -24,10 +24,10 @@ const getVideoById = asyncHandler(async (req, res, next) => {
     throw new ApiError(400, "Please provide video Id");
   }
 
-  const foundVideo = await Video.findById(videoId).populate(
-    "owner",
-    "userName fullName avatar"
-  );
+  //   const foundVideo = await Video.findById(videoId).populate("owner", "userName fullName avatar");
+  const foundVideo = await Video.find({
+    $and: [{ _id: videoId }, { isPublished: true }],
+  }).populate("owner", "userName fullName avatar");
   if (!foundVideo) {
     throw new ApiError(400, "No video with that id");
   }
@@ -145,11 +145,6 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video wasn't found");
   }
   foundVideo.isPublished = !foundVideo.isPublished;
-
-  console.log("🚀 ---------------------------------------------------------------------------------------------------------🚀")
-  console.log("🚀 ~ file: video.controller.js:149 ~ togglePublishStatus ~ foundVideo.isPublished:", foundVideo.isPublished)
-  console.log("🚀 ---------------------------------------------------------------------------------------------------------🚀")
-
   const newVideoStatus = foundVideo.save({ validateBeforeSave: false });
   res
     .status(200)
