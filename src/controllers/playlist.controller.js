@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
 
+//create playlist
 const createPlaylist = asyncHandler(async (req, res, next) => {
   const { name, description } = req.body;
   const { id } = req.user;
@@ -35,6 +36,7 @@ const createPlaylist = asyncHandler(async (req, res, next) => {
     );
 });
 
+// get user playlist
 const getUserPlaylist = asyncHandler(async (req, res, next) => {
   const { id } = req.user._id;
 
@@ -45,7 +47,7 @@ const getUserPlaylist = asyncHandler(async (req, res, next) => {
 
   //STEP :  add POPULATE method
   //! Important thing to note. read explanation carefully
-  //exp: here remember that we saved our owner field as ObjectId which is a BSON object id. but the id that we are getting from the user is a string. so we need to convert it to ObjectId. so that we can easily compare that with the stored owner field.
+  //exp: here remember that we saved our owner field as ObjectId which is a BSON object id. but the id that we are getting from the user is a string. so if we are not using mongoose's findById then we need to convert it to ObjectId. so that we can easily compare that with the stored owner field.
 
   //exp2: REMEMBER: we have to use $eq operator so that mongoose can compare for equality. We are tyring to check
   //exp: IF THE GIVEN OWNER ID IS EQUAL TO THE OWNER ID STORED IN THE PLAYLIST "OWNER" DOCUMENT
@@ -61,24 +63,8 @@ const getUserPlaylist = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(201, playlist, "Playlist fetched seccessfully"));
 });
 
-const getPlaylistById = asyncHandler(async (req, res, next) => {
-  //STEP:     GENERAL FETCH
-  // this will be a general fetch, where we are getting playlist with the playlist id, user doesn't have to login and anyone with this link/id can see the playlist.
-  const { id } = req.params;
-  if (!id?.trim) {
-    throw new ApiError(400, "Please provide playlist id");
-  }
-  const playlist = await Playlist.findById(id);
-  if (!playlist) {
-    throw new ApiError(400, "Playlist not found");
-  }
-  res
-    .status(200)
-    .json(new ApiResponse(201, playlist, "Playlist fetched seccessfully"));
-});
-//add video
-
-//todo: redo this video playlist after finishing the Video controller section!
+//add video to playlist
+//todo: make sure to check that same video is not added twice in the playlist
 const addVideoToPlaylist = asyncHandler(async (req, res, next) => {
   const { videoId, playlistId } = req.params;
   if (!videoId.trim || !playlistId.trim) {
@@ -91,29 +77,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res, next) => {
   if (!foundPlaylist) {
     throw new ApiError(400, "playlist not found");
   }
-  console.log(
-    "🚀 ----------------------------------------------------------------------------🚀"
-  );
-  console.log(
-    "🚀 ~ file: playlist.controller.js:84 ~ addVideoToPlaylist ~ videoId:",
-    new mongoose.Types.ObjectId(videoId)
-  );
   const processedVideoId = new mongoose.Types.ObjectId(videoId);
-
-  console.log(
-    "🚀 ----------------------------------------------------------------------------🚀"
-  );
-  console.log(
-    "🚀 ------------------------------------------------------------------------------------------------------🚀"
-  );
-  console.log(
-    "🚀 ~ file: playlist.controller.js:94 ~ addVideoToPlaylist ~ foundPlaylist.videos:",
-    foundPlaylist.videos
-  );
-  console.log(
-    "🚀 ------------------------------------------------------------------------------------------------------🚀"
-  );
-
   const videoSaved = foundPlaylist.videos.push(processedVideoId);
 
   if (!videoSaved) {
@@ -127,4 +91,54 @@ const addVideoToPlaylist = asyncHandler(async (req, res, next) => {
     .status(200)
     .json(new ApiResponse(201, foundPlaylist, "Video added successfully"));
 });
-export { createPlaylist, getUserPlaylist, getPlaylistById, addVideoToPlaylist };
+
+// get playlist by id
+//STEP:     GENERAL FETCH
+// this will be a general fetch, where we are getting playlist with the playlist id, user doesn't have to login and anyone with this link/id can see the playlist.
+const getPlaylistById = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  if (!id?.trim) {
+    throw new ApiError(400, "Please provide playlist id");
+  }
+  const playlist = await Playlist.findById(id).populate("videos");
+  if (!playlist) {
+    throw new ApiError(400, "Playlist not found");
+  }
+  res
+    .status(200)
+    .json(new ApiResponse(201, playlist, "Playlist fetched seccessfully"));
+});
+
+// remove video from playlist
+const removeVideoFromPlaylist = asyncHandler(async (req, res, next) => {
+  const { videoId, playlistId } = req.params;
+
+  // find playlist from playlist collection
+  // find video from that playlist using id
+  // remove (update, patch)that video
+  if (!videoId || !playlistId) {
+    throw new ApiError(400, "Please provide required fields");
+  }
+
+  const foundPlaylist = await Playlist.findByIdAndUpdate(
+    playlistId,
+    {
+      $pull: { videos: videoId },
+    },
+    { new: true }
+  );
+  if (!foundPlaylist) {
+    throw new ApiError(500, "Error deleting video from playlist");
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(201, foundPlaylist, "Video Removed successfully"));
+});
+export {
+  createPlaylist,
+  getUserPlaylist,
+  getPlaylistById,
+  addVideoToPlaylist,
+  removeVideoFromPlaylist,
+};
