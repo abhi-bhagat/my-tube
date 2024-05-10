@@ -166,6 +166,29 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 const updatePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   const { name, description } = req.body;
+
+  if (!playlistId) {
+    throw new ApiError(400, "playlist id was not found");
+  }
+  if (!name && !description) {
+    throw new ApiError(400, "name and description can't be empty");
+  }
+  const updatedPlaylist = await Playlist.findByIdAndUpdate(
+    playlistId,
+    {
+      $set: { name, description },
+    },
+    { new: true }
+  );
+  if (!updatedPlaylist) {
+    throw new ApiError(500, "Error updating the playlist");
+  }
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(201, updatePlaylist, "playlist updated successfully")
+    );
 });
 export {
   createPlaylist,
@@ -174,4 +197,5 @@ export {
   addVideoToPlaylist,
   removeVideoFromPlaylist,
   deletePlaylist,
+  updatePlaylist,
 };
