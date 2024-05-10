@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
 
-//create playlist
+//* create playlist
 const createPlaylist = asyncHandler(async (req, res, next) => {
   const { name, description } = req.body;
   const { id } = req.user;
@@ -36,7 +36,7 @@ const createPlaylist = asyncHandler(async (req, res, next) => {
     );
 });
 
-// get user playlist
+//*  get user playlist
 const getUserPlaylist = asyncHandler(async (req, res, next) => {
   const { id } = req.user._id;
 
@@ -63,21 +63,29 @@ const getUserPlaylist = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(201, playlist, "Playlist fetched seccessfully"));
 });
 
-//add video to playlist
+//* add video to playlist
 //todo: make sure to check that same video is not added twice in the playlist
 const addVideoToPlaylist = asyncHandler(async (req, res, next) => {
   const { videoId, playlistId } = req.params;
   if (!videoId.trim || !playlistId.trim) {
     throw new ApiError(400, "Video or playlist id missing");
-    // find playlist
-    // push videoId into playlist video array, then we can fetch those videos using populate method
   }
-  const foundPlaylist = await Playlist.findById(playlistId);
+  // following is correct code but will not generate any error messages
+  //? const foundPlaylist = await Playlist.findByIdAndUpdate(playlistId, {
+  // ?  $addToSet: { videos: new mongoose.Types.ObjectId(videoId) },
+  // ?});
 
+  const foundPlaylist = await Playlist.findById(playlistId);
   if (!foundPlaylist) {
     throw new ApiError(400, "playlist not found");
   }
-  const processedVideoId = new mongoose.Types.ObjectId(videoId);
+
+  const videoExists = foundPlaylist.videos.includes(
+    new mongoose.Types.ObjectId(videoId)
+  );
+  if (videoExists) {
+    throw new ApiError(409, "Video is already in the playlist");
+  }
   const videoSaved = foundPlaylist.videos.push(processedVideoId);
 
   if (!videoSaved) {
@@ -92,7 +100,7 @@ const addVideoToPlaylist = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(201, foundPlaylist, "Video added successfully"));
 });
 
-// get playlist by id
+//*  get playlist by id
 //STEP:     GENERAL FETCH
 // this will be a general fetch, where we are getting playlist with the playlist id, user doesn't have to login and anyone with this link/id can see the playlist.
 const getPlaylistById = asyncHandler(async (req, res, next) => {
@@ -109,7 +117,7 @@ const getPlaylistById = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(201, playlist, "Playlist fetched seccessfully"));
 });
 
-// remove video from playlist
+//*  remove video from playlist
 const removeVideoFromPlaylist = asyncHandler(async (req, res, next) => {
   const { videoId, playlistId } = req.params;
 
@@ -135,10 +143,35 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res, next) => {
     .status(200)
     .json(new ApiResponse(201, foundPlaylist, "Video Removed successfully"));
 });
+
+//*  DELETE PLAYLIST
+const deletePlaylist = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
+  if (!playlistId) {
+    throw new ApiError(400, "Playlist doesn't exist");
+  }
+
+  try {
+    await Playlist.findByIdAndDelete(playlistId);
+  } catch (error) {
+    res.status(500, `Error deleting playlist ${error}`);
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(201, {}, "Playlist deleted successfully"));
+});
+
+//* UPDATE PLAYLIST
+const updatePlaylist = asyncHandler(async (req, res) => {
+  const { playlistId } = req.params;
+  const { name, description } = req.body;
+});
 export {
   createPlaylist,
   getUserPlaylist,
   getPlaylistById,
   addVideoToPlaylist,
   removeVideoFromPlaylist,
+  deletePlaylist,
 };

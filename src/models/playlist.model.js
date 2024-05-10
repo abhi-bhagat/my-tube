@@ -20,6 +20,7 @@ const playlistSchema = new mongoose.Schema(
       {
         type: Schema.Types.ObjectId,
         ref: "Video",
+        unique: true,
       },
     ],
   },
