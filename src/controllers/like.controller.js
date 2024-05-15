@@ -3,9 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { Like } from "../models/like.model.js";
 import mongoose, { MongooseError } from "mongoose";
 import { ApiResponse } from "../utils/ApiResponse.js";
-const liked = false;
-//exp:
-//* idea here is that create seperate documents for all the likes. for eg, save video like, liked by in one document if someone likes a video and after that we can "lookup" by all the videos that are liked by user.
+
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   const { id } = req.user;
